@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+        }
+
+        #gameArea {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        #status {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .health-container {
+            width: 300px;
+            margin: 10px 0;
+        }
+
+        .health-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 16px;
+            color: #888;
+        }
+
+        .healthBar {
+            width: 100%;
+            height: 30px;
+            background-color: #333;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .health {
+            width: 100%;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        #playerHealth {
+            background-color: #4CAF50;
+        }
+
+        #enemyHealth {
+            background-color: #f44336;
+        }
+
+        .message {
+            font-size: 18px;
+            margin-top: 10px;
+            color: #888;
+        }
+
+        .attack-effect {
+            position: absolute;
+            pointer-events: none;
+            font-size: 24px;
+            animation: fadeUp 0.5s ease-out forwards;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: #2a2a2a;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 80%;
+        }
+
+        .result-title {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .win {
+            color: #4CAF50;
+        }
+
+        .lose {
+            color: #f44336;
+        }
+
+        .play-again-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+
+        .play-again-btn:hover {
+            background-color: #45a049;
+        }
+
+        @keyframes fadeUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+        }
+
+        .countdown {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 120px;
+            font-weight: bold;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="status">Connecting...</div>
+        
+        <div class="health-container">
+            <div class="health-label">
+                <span>Enemy</span>
+                <span id="enemyHPText">100 HP</span>
+            </div>
+            <div class="healthBar">
+                <div id="enemyHealth" class="health"></div>
+            </div>
+        </div>
+
+        <div class="health-container">
+            <div class="health-label">
+                <span>You</span>
+                <span id="playerHPText">100 HP</span>
+            </div>
+            <div class="healthBar">
+                <div id="playerHealth" class="health"></div>
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <div id="resultTitle" class="result-title"></div>
+            <button id="playAgainBtn" class="play-again-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const status = document.getElementById('status');
+        const playerHealth = document.getElementById('playerHealth');
+        const enemyHealth = document.getElementById('enemyHealth');
+        const playerHPText = document.getElementById('playerHPText');
+        const enemyHPText = document.getElementById('enemyHPText');
+        const message = document.getElementById('message');
+        const gameArea = document.getElementById('gameArea');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const resultTitle = document.getElementById('resultTitle');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+
+        let canAttack = false;
+
+        function showCountdown(count) {
+            const countdownEl = document.createElement('div');
+            countdownEl.className = 'countdown';
+            countdownEl.textContent = count;
+            document.body.appendChild(countdownEl);
+
+            setTimeout(() => {
+                countdownEl.remove();
+            }, 900); // Remove slightly before next number
+        }
+
+        function startCountdown() {
+            canAttack = false;
+            let count = 3;
+            
+            showCountdown(count);
+            
+            const countInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    showCountdown(count);
+                } else if (count === 0) {
+                    showCountdown('FIGHT!');
+                    setTimeout(() => {
+                        canAttack = true;
+                    }, 900);
+                    clearInterval(countInterval);
+                }
+            }, 1000);
+        }
+
+        // Connect to WebSocket server
+        let ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+        function updateHealthBars(playerHP, enemyHP) {
+            playerHealth.style.width = Math.max(0, playerHP) + '%';
+            enemyHealth.style.width = Math.max(0, enemyHP) + '%';
+            playerHPText.textContent = Math.max(0, playerHP) + ' HP';
+            enemyHPText.textContent = Math.max(0, enemyHP) + ' HP';
+        }
+
+        function showGameOverModal(result) {
+            resultTitle.textContent = result;
+            resultTitle.className = 'result-title ' + (result === 'You Won!' ? 'win' : 'lose');
+            gameOverModal.classList.add('show');
+            canAttack = false;
+        }
+
+        function startNewGame() {
+            gameOverModal.classList.remove('show');
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            setupWebSocket();
+        }
+
+        function setupWebSocket() {
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                switch(data.type) {
+                    case 'status':
+                        status.textContent = data.message;
+                        break;
+                    case 'gameStart':
+                        status.textContent = 'Get Ready!';
+                        message.textContent = data.message;
+                        updateHealthBars(100, 100);
+                        startCountdown();
+                        break;
+                    case 'damage':
+                        updateHealthBars(data.hp, data.enemyHp);
+                        
+                        // Show damage effect
+                        const effect = document.createElement('div');
+                        effect.className = 'attack-effect';
+                        effect.textContent = `-${data.damage}`;
+                        effect.style.left = Math.random() * 80 + 10 + '%';
+                        effect.style.top = Math.random() * 80 + 10 + '%';
+                        gameArea.appendChild(effect);
+                        
+                        // Remove effect after animation
+                        setTimeout(() => effect.remove(), 500);
+                        
+                        message.textContent = data.message;
+                        break;
+                    case 'gameOver':
+                        status.textContent = 'Game Over';
+                        message.textContent = data.message;
+                        showGameOverModal(data.message);
+                        // Don't show connection lost message after game over
+                        ws.onclose = null;
+                        break;
+                }
+            };
+
+            ws.onclose = function() {
+                // Only show connection lost if it wasn't a normal game over
+                if (gameOverModal.classList.contains('show')) return;
+                status.textContent = 'Connection lost';
+                showGameOverModal('Connection Lost');
+            };
+        }
+
+        // Initial WebSocket setup
+        setupWebSocket();
+
+        // Handle attacks
+        gameArea.addEventListener('click', function() {
+            if (ws.readyState === WebSocket.OPEN && canAttack) {
+                ws.send(JSON.stringify({ type: 'attack' }));
+            }
+        });
+
+        // Handle touch events for mobile
+        gameArea.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            if (ws.readyState === WebSocket.OPEN && canAttack) {
+                ws.send(JSON.stringify({ type: 'attack' }));
+            }
+        });
+
+        // Handle play again button
+        playAgainBtn.addEventListener('click', startNewGame);
+    </script>
+</body>
+</html> 

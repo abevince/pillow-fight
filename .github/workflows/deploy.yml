@@ -1,0 +1,59 @@
+name: Deploy to Digital Ocean
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/battle-game
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Deploy to Digital Ocean droplet
+        run: |
+          # Write SSH key
+          echo "${{ secrets.DIGITALOCEAN_SSH_KEY }}" > private.key
+          chmod 600 private.key
+          
+          # Deploy using SSH
+          ssh -o StrictHostKeyChecking=no -i private.key root@${{ secrets.DROPLET_IP }} << 'EOF'
+            # Pull latest image
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            
+            # Stop existing container
+            docker stop battle-game || true
+            docker rm battle-game || true
+            
+            # Run new container
+            docker run -d \
+              --name battle-game \
+              --restart always \
+              -p 80:8080 \
+              ${{ env.DOCKER_IMAGE }}:latest
+          EOF 
